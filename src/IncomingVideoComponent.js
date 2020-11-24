@@ -139,7 +139,7 @@ export default class IncomingVideoComponent extends React.Component {
     // places the local audio/video in state so we can easily mute later
     Array.from(room.localParticipant.tracks.values()).forEach((track) => {
       if (track.kind === "audio") {
-        //track.disable();
+        track.disable();
         this.setState({
           localAudio: track
         })
