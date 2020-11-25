@@ -9,7 +9,7 @@
     "flex-plugin-scripts": "^4.3.5-beta.0",
     "react": "16.5.2",
     "react-dom": "16.5.2",
-    "twilio-video": "^2.8.0"
+    "twilio-video": "^1.20.1"
   },
   "devDependencies": {
     "@twilio/flex-ui": "^1"
