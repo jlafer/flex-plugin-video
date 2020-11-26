@@ -1,9 +1,11 @@
 function turnRoomSidIntoRoomName(client, roomSid) {
   return new Promise((resolve, reject) => {
-    client.video.rooms(roomSid).fetch().then(room => {
+    client.video.rooms(roomSid).fetch()
+    .then(room => {
       console.log("turnRoomSidIntoRoomName", room);
       resolve(room.uniqueName);
-    }).catch(err => {
+    })
+    .catch(err => {
       reject(err);
     })
   })
@@ -11,10 +13,12 @@ function turnRoomSidIntoRoomName(client, roomSid) {
 
 function loadSyncMapDataByRoomName(client, syncService, roomName) {
   return new Promise((resolve, reject) => {
-    client.sync.services(syncService).documents(roomName).fetch().then(doc => {
+    client.sync.services(syncService).documents(roomName).fetch()
+    .then(doc => {
       console.log("loadSyncMapDataByRoomName", doc);
       resolve(doc.data);
-    }).catch(err => {
+    })
+    .catch(err => {
       reject(err);
     })
   })

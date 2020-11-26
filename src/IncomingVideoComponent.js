@@ -58,8 +58,7 @@ export default class IncomingVideoComponent extends React.Component {
       this.setState({ taskStatus });
       if (taskStatus === 'assigned') {
         fetch(
-          `${REACT_APP_SERVERLESS_DOMAIN}/flexvideotokenizer?Identity=${this.props.manager.workerClient.name}`,
-          {referrer: 'http:localhost:3000'}
+          `${REACT_APP_SERVERLESS_DOMAIN}/flexvideotokenizer?Identity=${this.props.manager.workerClient.name}`
         )
         .then(response => {
           return response.json()
