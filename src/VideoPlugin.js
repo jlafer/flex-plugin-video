@@ -43,8 +43,8 @@ export default class VideoPlugin extends FlexPlugin {
     videoChannel.addedComponents = [
       {
         target: "TaskCanvasTabs",
-        sortOrder: 1,
-        align: "start",
+        options: {sortOrder: 1,
+        align: "start"},
         component: <IncomingVideoComponent manager={manager} icon="Video" iconActive="Video" key="IncomingVideoComponent" />
       }
     ];

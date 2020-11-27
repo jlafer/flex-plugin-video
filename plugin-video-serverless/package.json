@@ -8,7 +8,8 @@
     "deploy": "twilio-run deploy"
   },
   "dependencies": {
-    "jlafer-twilio-runtime-util": "0.0.9"
+    "jlafer-twilio-runtime-util": "0.0.9",
+    "twilio": "^3.52.0"
   },
   "devDependencies": {
     "twilio-run": "^2.6.0"

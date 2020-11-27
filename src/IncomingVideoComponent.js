@@ -50,6 +50,7 @@ export default class IncomingVideoComponent extends React.Component {
     this.unMute = this.unMute.bind(this);
     this.camOff = this.camOff.bind(this);
     this.camOn = this.camOn.bind(this);
+    this.dialTarget = this.dialTarget.bind(this);
   }
 
   componentDidUpdate() {
@@ -185,6 +186,17 @@ export default class IncomingVideoComponent extends React.Component {
     });
   }
 
+  dialTarget() {
+    console.log('dialTarget: room', this.state.activeRoom);
+    const urlParams = `number=${this.props.task.attributes.phoneNumber}&roomName=${this.state.activeRoom.name}`;
+    fetch(
+      `${REACT_APP_SERVERLESS_DOMAIN}/dialAndAddToRoom?${urlParams}`
+    )
+    .then(response => {
+      return response.json()
+    })
+  }
+
   mute() {
     this.state.localAudio.disable();
     this.setState({
@@ -258,6 +270,7 @@ export default class IncomingVideoComponent extends React.Component {
         { this.state.localAudioDisabled ? <Button onClick={ this.unMute } variant='contained' style={EvilButtonStyle} color="secondary">Unmute</Button> : null }
         { !this.state.localVideoDisabled ? <Button onClick={ this.camOff } variant='contained' style={ButtonStyle} color="primary">Turn Camera Off</Button> : null }
         { this.state.localVideoDisabled ? <Button onClick={ this.camOn } variant='contained' style={EvilButtonStyle} color="secondary">Turn Camera On</Button> : null }
+        <Button onClick={ this.dialTarget } variant='contained' style={EvilButtonStyle} color="secondary">Dial Target</Button>
         <div style={RemoteStyle} ref="remoteMedia" id="remote-media"></div>
       </div>
     )
