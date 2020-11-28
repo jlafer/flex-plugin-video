@@ -47,6 +47,8 @@ export default class IncomingVideoComponent extends React.Component {
     this.camOff = this.camOff.bind(this);
     this.camOn = this.camOn.bind(this);
     this.dialTarget = this.dialTarget.bind(this);
+
+    this.remoteMedia = React.createRef();
   }
 
   componentDidUpdate() {
@@ -148,21 +150,23 @@ export default class IncomingVideoComponent extends React.Component {
       return;
     })
 
+    const remoteContainer = this.remoteMedia.current;
+
     // add local tracks
     this.attachLocalTracks(
       Array.from(room.localParticipant.tracks.values()),
-      this.refs.remoteMedia
+      remoteContainer
     );
 
     // add participant tracks
     room.participants.forEach((participant) => {
-        this.attachParticipantTracks(participant, this.refs.remoteMedia);
+        this.attachParticipantTracks(participant, remoteContainer);
     });
 
     // when a participant adds a track, attach it
     room.on('trackSubscribed', (track, participant) => {
       console.log(participant.identity + " added track: " + track.kind);
-      this.attachTracks([track], this.refs.remoteMedia);
+      this.attachTracks([track], remoteContainer);
     });
 
     // when a Participant removes a Track, detach it from the DOM
@@ -272,8 +276,8 @@ export default class IncomingVideoComponent extends React.Component {
         { this.state.localAudioDisabled ? <Button onClick={ this.unMute } variant='contained' style={EvilButtonStyle} color="secondary">Unmute</Button> : null }
         { !this.state.localVideoDisabled ? <Button onClick={ this.camOff } variant='contained' style={ButtonStyle} color="primary">Turn Camera Off</Button> : null }
         { this.state.localVideoDisabled ? <Button onClick={ this.camOn } variant='contained' style={EvilButtonStyle} color="secondary">Turn Camera On</Button> : null }
-        <Button onClick={ this.dialTarget } variant='contained' style={EvilButtonStyle} color="secondary">Dial Target</Button>
-        <div style={RemoteStyle} ref="remoteMedia" id="remote-media"></div>
+        { this.state.activeRoom ? <Button onClick={ this.dialTarget } variant='contained' style={ButtonStyle} color="primary">Dial Target</Button> : null }
+        <div style={RemoteStyle} ref={this.remoteMedia} id="remote-media"></div>
       </div>
     )
   }
