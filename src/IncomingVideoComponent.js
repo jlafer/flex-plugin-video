@@ -2,6 +2,8 @@ import React from 'react';
 import Video from 'twilio-video';
 import Button from '@material-ui/core/Button';
 
+import VideoRoom from './VideoRoom';
+
 const {REACT_APP_SERVERLESS_DOMAIN} = process.env;
 
 const ButtonStyle = {
@@ -34,10 +36,10 @@ export default class IncomingVideoComponent extends React.Component {
       localVideoDisabled: false
     };
     this.onRoomJoined = this.onRoomJoined.bind(this);
-    this.attachTracks = this.attachTracks.bind(this);
-    this.attachParticipantTracks = this.attachParticipantTracks.bind(this);
-    this.detachTracks = this.detachTracks.bind(this);
-    this.detachParticipantTracks = this.detachParticipantTracks.bind(this);
+    this.participantConnected = this.participantConnected.bind(this);
+    this.participantDisconnected = this.participantDisconnected.bind(this);
+    this.trackSubscribed = this.trackSubscribed.bind(this);
+    this.trackUnsubscribed = this.trackUnsubscribed.bind(this);
     this.disconnect = this.disconnect.bind(this);
     this.getScreenShare = this.getScreenShare.bind(this);
     this.startScreenShare = this.startScreenShare.bind(this);
@@ -85,109 +87,68 @@ export default class IncomingVideoComponent extends React.Component {
     }
   }
 
-  // attach the tracks to the DOM
-  attachTracks(tracks, container) {
-    tracks.forEach(function(track) {
-      const trackDom = track.attach();
-      trackDom.style.maxWidth = "100%";
-      trackDom.style.minWidth = "100%";
-      container.appendChild(trackDom);
-    });
-  }
-
-  attachLocalTracks(tracks, container) {
-    tracks.forEach(function(track) {
-      const trackDom = track.attach();
-      trackDom.style.maxWidth = "15%";
-      trackDom.style.position = "absolute";
-      trackDom.style.top = "80px";
-      trackDom.style.left = "10px";
-      container.appendChild(trackDom);
-    });
-  }
-
-  // attach the Participant's Tracks to the DOM
-  attachParticipantTracks(participant, container) {
-    const tracks = Array.from(participant.tracks.values());
-    this.attachTracks(tracks, container);
-  }
-
-  // detach the Tracks from the DOM
-  detachTracks(tracks) {
-    tracks.forEach(function(track) {
-      track.detach().forEach(function(detachedElement) {
-        detachedElement.remove();
-      });
-    });
-  }
-
-  // detach the Participant's Tracks from the DOM
-  detachParticipantTracks(participant) {
-    const tracks = Array.from(participant.tracks.values());
-    this.detachTracks(tracks);
-  }
-
   onRoomJoined(room) {
-    this.setState({
-      activeRoom: room
-    });
+    this.setState({activeRoom: room});
+    this.participantConnected(room.localParticipant)
+    room.participants.forEach(this.participantConnected);
+    room.on('participantConnected', this.participantConnected);
+    room.on('participantDisconnected', this.participantDisconnected);
+    room.once('disconnected', error => room.participants.forEach(this.participantDisconnected));
 
-    console.log(Array.from(room.localParticipant.tracks.values()));
-
-    // place the local audio/video in state so we can easily mute later
-    Array.from(room.localParticipant.tracks.values()).forEach((track) => {
-      if (track.kind === "audio") {
-        track.disable();
-        this.setState({
-          localAudio: track
-        })
-        return;
-      }
-      // TODO this won't work if there are data tracks
+    // place the local audio in muted state
+    // TODO hacky! relying on their being only one pub of each type!
+    room.localParticipant.audioTracks.forEach((publication) => {
+      publication.track.disable();
       this.setState({
-        localVideo: track
+        localAudio: publication.track
       })
-      return;
     })
+    room.localParticipant.videoTracks.forEach((publication) => {
+      this.setState({
+        localVideo: publication.track
+      })
+    })
+  }
 
+  participantConnected(participant) {
+    console.log(`participant ${participant.identity} connected`);
     const remoteContainer = this.remoteMedia.current;
-
-    // add local tracks
-    this.attachLocalTracks(
-      Array.from(room.localParticipant.tracks.values()),
-      remoteContainer
-    );
-
-    // add participant tracks
-    room.participants.forEach((participant) => {
-        this.attachParticipantTracks(participant, remoteContainer);
+    const div = document.createElement('div');
+    div.id = participant.sid;
+    div.innerText = participant.identity;
+    remoteContainer.appendChild(div);
+  
+    participant.on('trackSubscribed', track => this.trackSubscribed(participant, track));
+    participant.on('trackUnsubscribed', this.trackUnsubscribed);
+  
+    participant.tracks.forEach(publication => {
+      if (publication.isSubscribed) {
+        this.trackSubscribed(participant, publication.track);
+      }
     });
-
-    // when a participant adds a track, attach it
-    room.on('trackSubscribed', (track, participant) => {
-      console.log(participant.identity + " added track: " + track.kind);
-      this.attachTracks([track], remoteContainer);
-    });
-
-    // when a Participant removes a Track, detach it from the DOM
-    room.on('trackUnsubscribed', (track, participant) => {
-      console.log(participant.identity + " removed track: " + track.kind);
-      this.detachTracks([track]);
-    });
-
-    // when a Participant leaves the Room, detach its Tracks
-    room.on('participantDisconnected', (participant) => {
-      console.log("Participant '" + participant.identity + "' left the room");
-      this.detachParticipantTracks(participant);
-    });
-
-    // once the LocalParticipant leaves the room, detach the Tracks
-    // of all Participants, including that of the LocalParticipant.
-    room.on('disconnected', () => {
-      console.log('Left');
-      this.detachParticipantTracks(room.localParticipant);
-      room.participants.forEach(this.detachParticipantTracks);
-    });
+  }
+  
+  participantDisconnected(participant) {
+    console.log(`participant ${participant.identity} disconnected`);
+    document.getElementById(participant.sid).remove();
+  }
+  
+  trackSubscribed(participant, track) {
+    const trackDom = track.attach();
+    const participantElement = document.getElementById(participant.sid);
+    // remote
+    //trackDom.style.maxWidth = "100%";
+    //trackDom.style.minWidth = "100%";
+    // local
+    //trackDom.style.maxWidth = "15%";
+    //trackDom.style.position = "absolute";
+    //trackDom.style.top = "80px";
+    //trackDom.style.left = "10px";
+    participantElement.appendChild(trackDom);
+  }
+  
+  trackUnsubscribed(track) {
+    track.detach().forEach(element => element.remove());
   }
 
   dialTarget() {
