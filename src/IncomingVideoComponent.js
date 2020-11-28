@@ -8,13 +8,10 @@ const ButtonStyle = {
   margin: '20px 10px',
   background: "#2aa4a2"
 };
-
 const EvilButtonStyle = {
   margin: '20px 10px',
   background: "red"
 };
-
-
 const RemoteStyle = {
   minWidth: '80%'
 };
@@ -22,7 +19,7 @@ const RemoteStyle = {
 const disconnectedStatuses = [
   'completed',
   'wrapping'
-]
+];
 
 export default class IncomingVideoComponent extends React.Component {
   constructor(props) {
@@ -31,20 +28,19 @@ export default class IncomingVideoComponent extends React.Component {
       activeRoom: null,
       taskStatus: null,
       screenTrack: null,
-      isScreenSharing: false,
       localAudio: null,
       localAudioDisabled: true,
       localVideo: null,
       localVideoDisabled: false
     };
-    this.roomJoined = this.roomJoined.bind(this);
+    this.onRoomJoined = this.onRoomJoined.bind(this);
     this.attachTracks = this.attachTracks.bind(this);
     this.attachParticipantTracks = this.attachParticipantTracks.bind(this);
     this.detachTracks = this.detachTracks.bind(this);
     this.detachParticipantTracks = this.detachParticipantTracks.bind(this);
     this.disconnect = this.disconnect.bind(this);
     this.getScreenShare = this.getScreenShare.bind(this);
-    this.screenShare = this.screenShare.bind(this);
+    this.startScreenShare = this.startScreenShare.bind(this);
     this.stopScreenShare = this.stopScreenShare.bind(this);
     this.mute = this.mute.bind(this);
     this.unMute = this.unMute.bind(this);
@@ -66,10 +62,10 @@ export default class IncomingVideoComponent extends React.Component {
         })
         .then(data => {
           if (!data.token) {
-            return console.log('wow, there was an error with the video tokenizer response');
+            return console.log('there was an error with the video tokenizer response');
           }
           Video.connect(data.token, { name: this.props.task.attributes.videoChatRoom })
-            .then(this.roomJoined, error => {
+            .then(this.onRoomJoined, error => {
             alert('Could not connect to Twilio: ' + error.message);
           });
         })
@@ -87,10 +83,10 @@ export default class IncomingVideoComponent extends React.Component {
     }
   }
 
-  // Attach the Tracks to the DOM.
+  // attach the tracks to the DOM
   attachTracks(tracks, container) {
     tracks.forEach(function(track) {
-      let trackDom = track.attach();
+      const trackDom = track.attach();
       trackDom.style.maxWidth = "100%";
       trackDom.style.minWidth = "100%";
       container.appendChild(trackDom);
@@ -99,7 +95,7 @@ export default class IncomingVideoComponent extends React.Component {
 
   attachLocalTracks(tracks, container) {
     tracks.forEach(function(track) {
-      let trackDom = track.attach();
+      const trackDom = track.attach();
       trackDom.style.maxWidth = "15%";
       trackDom.style.position = "absolute";
       trackDom.style.top = "80px";
@@ -108,13 +104,13 @@ export default class IncomingVideoComponent extends React.Component {
     });
   }
 
-  // Attach the Participant's Tracks to the DOM.
+  // attach the Participant's Tracks to the DOM
   attachParticipantTracks(participant, container) {
-    var tracks = Array.from(participant.tracks.values());
+    const tracks = Array.from(participant.tracks.values());
     this.attachTracks(tracks, container);
   }
 
-  // Detach the Tracks from the DOM.
+  // detach the Tracks from the DOM
   detachTracks(tracks) {
     tracks.forEach(function(track) {
       track.detach().forEach(function(detachedElement) {
@@ -123,20 +119,20 @@ export default class IncomingVideoComponent extends React.Component {
     });
   }
 
-  // Detach the Participant's Tracks from the DOM.
+  // detach the Participant's Tracks from the DOM
   detachParticipantTracks(participant) {
-    var tracks = Array.from(participant.tracks.values());
+    const tracks = Array.from(participant.tracks.values());
     this.detachTracks(tracks);
   }
 
-  roomJoined(room) {
+  onRoomJoined(room) {
     this.setState({
       activeRoom: room
     });
 
     console.log(Array.from(room.localParticipant.tracks.values()));
 
-    // places the local audio/video in state so we can easily mute later
+    // place the local audio/video in state so we can easily mute later
     Array.from(room.localParticipant.tracks.values()).forEach((track) => {
       if (track.kind === "audio") {
         track.disable();
@@ -145,6 +141,7 @@ export default class IncomingVideoComponent extends React.Component {
         })
         return;
       }
+      // TODO this won't work if there are data tracks
       this.setState({
         localVideo: track
       })
@@ -152,7 +149,10 @@ export default class IncomingVideoComponent extends React.Component {
     })
 
     // add local tracks
-    this.attachLocalTracks(Array.from(room.localParticipant.tracks.values()), this.refs.remoteMedia);
+    this.attachLocalTracks(
+      Array.from(room.localParticipant.tracks.values()),
+      this.refs.remoteMedia
+    );
 
     // add participant tracks
     room.participants.forEach((participant) => {
@@ -165,19 +165,19 @@ export default class IncomingVideoComponent extends React.Component {
       this.attachTracks([track], this.refs.remoteMedia);
     });
 
-    // When a Participant removes a Track, detach it from the DOM.
+    // when a Participant removes a Track, detach it from the DOM
     room.on('trackUnsubscribed', (track, participant) => {
       console.log(participant.identity + " removed track: " + track.kind);
       this.detachTracks([track]);
     });
 
-    // When a Participant leaves the Room, detach its Tracks.
+    // when a Participant leaves the Room, detach its Tracks
     room.on('participantDisconnected', (participant) => {
       console.log("Participant '" + participant.identity + "' left the room");
       this.detachParticipantTracks(participant);
     });
 
-    // Once the LocalParticipant leaves the room, detach the Tracks
+    // once the LocalParticipant leaves the room, detach the Tracks
     // of all Participants, including that of the LocalParticipant.
     room.on('disconnected', () => {
       console.log('Left');
@@ -187,8 +187,10 @@ export default class IncomingVideoComponent extends React.Component {
   }
 
   dialTarget() {
-    console.log('dialTarget: room', this.state.activeRoom);
-    const urlParams = `number=${this.props.task.attributes.phoneNumber}&roomName=${this.state.activeRoom.name}`;
+    const {phoneNumber} = this.props.task.attributes;
+    const {name: roomName} = this.state.activeRoom;
+    console.log(`dialing ${phoneNumber} from room ${roomName}`);
+    const urlParams = `number=${phoneNumber}&roomName=${roomName}`;
     fetch(
       `${REACT_APP_SERVERLESS_DOMAIN}/dialAndAddToRoom?${urlParams}`
     )
@@ -210,6 +212,7 @@ export default class IncomingVideoComponent extends React.Component {
       localAudioDisabled: false
     })
   }
+
   camOff() {
     this.state.localVideo.disable();
     this.setState({
@@ -241,13 +244,13 @@ export default class IncomingVideoComponent extends React.Component {
     }
   }
 
-  screenShare() {
-    this.getScreenShare().then((stream) => {
-      let screenTrack = stream.getVideoTracks()[0];
+  startScreenShare() {
+    this.getScreenShare()
+    .then((stream) => {
+      const screenTrack = stream.getVideoTracks()[0];
       this.state.activeRoom.localParticipant.publishTrack(screenTrack);
       this.setState({
-        screenTrack: screenTrack,
-        isScreenSharing: true
+        screenTrack: screenTrack
       });
     })
   }
@@ -255,8 +258,7 @@ export default class IncomingVideoComponent extends React.Component {
   stopScreenShare() {
     this.state.activeRoom.localParticipant.unpublishTrack(this.state.screenTrack);
     this.setState({
-      screenTrack: null,
-      isScreenSharing: false
+      screenTrack: null
     });
   }
 
@@ -264,8 +266,8 @@ export default class IncomingVideoComponent extends React.Component {
     return (
       <div>
         <Button variant="contained" style={ButtonStyle} color="secondary" onClick={this.disconnect}>Disconnect</Button>
-        { !this.state.isScreenSharing ? <Button onClick={this.screenShare} variant='contained' style={ButtonStyle} color="primary">Screen Share</Button> : null }
-        { this.state.isScreenSharing ? <Button onClick={this.stopScreenShare} variant='contained' style={EvilButtonStyle}  color="secondary">Stop Screen Share</Button> : null }
+        { !this.state.screenTrack ? <Button onClick={this.startScreenShare} variant='contained' style={ButtonStyle} color="primary">Screen Share</Button> : null }
+        { this.state.screenTrack ? <Button onClick={this.stopScreenShare} variant='contained' style={EvilButtonStyle}  color="secondary">Stop Screen Share</Button> : null }
         { !this.state.localAudioDisabled ? <Button onClick={ this.mute } variant='contained' style={ButtonStyle} color="primary">Mute</Button> : null }
         { this.state.localAudioDisabled ? <Button onClick={ this.unMute } variant='contained' style={EvilButtonStyle} color="secondary">Unmute</Button> : null }
         { !this.state.localVideoDisabled ? <Button onClick={ this.camOff } variant='contained' style={ButtonStyle} color="primary">Turn Camera Off</Button> : null }
