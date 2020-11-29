@@ -87,27 +87,19 @@ export default class IncomingVideoComponent extends React.Component {
     }
   }
 
-  onRoomJoined(room) {
+  async onRoomJoined(room) {
     this.setState({activeRoom: room});
     this.participantConnected(room.localParticipant)
     room.participants.forEach(this.participantConnected);
     room.on('participantConnected', this.participantConnected);
     room.on('participantDisconnected', this.participantDisconnected);
-    room.once('disconnected', error => room.participants.forEach(this.participantDisconnected));
+    room.once(
+      'disconnected',
+      _err => room.participants.forEach(this.participantDisconnected)
+    );
 
-    // place the local audio in muted state
-    // TODO hacky! relying on their being only one pub of each type!
-    room.localParticipant.audioTracks.forEach((publication) => {
-      publication.track.disable();
-      this.setState({
-        localAudio: publication.track
-      })
-    })
-    room.localParticipant.videoTracks.forEach((publication) => {
-      this.setState({
-        localVideo: publication.track
-      })
-    })
+    const localVideoTrack = await Video.createLocalVideoTrack();
+    await room.localParticipant.publishTrack(localVideoTrack);
   }
 
   participantConnected(participant) {
@@ -116,16 +108,40 @@ export default class IncomingVideoComponent extends React.Component {
     const div = document.createElement('div');
     div.id = participant.sid;
     div.innerText = participant.identity;
+    div.style.borderStyle = "solid";
+    div.style.borderWidth = "3px";
+    div.style.borderColor = "red";
     remoteContainer.appendChild(div);
   
-    participant.on('trackSubscribed', track => this.trackSubscribed(participant, track));
+    participant.on(
+      'trackSubscribed',
+      track => this.trackSubscribed(participant, track)
+    );
     participant.on('trackUnsubscribed', this.trackUnsubscribed);
   
     participant.tracks.forEach(publication => {
-      if (publication.isSubscribed) {
+      if (publication.track) {
         this.trackSubscribed(participant, publication.track);
       }
     });
+    // TODO figure out how to distinguish local from remote
+    if (true) {
+      // place the local audio in muted state
+      // TODO hacky! relying on their being only one pub of each type!
+      participant.audioTracks.forEach((publication) => {
+        if (publication.track) {
+          publication.track.disable();
+          this.setState({
+            localAudio: publication.track
+          })
+        }
+      })
+      participant.videoTracks.forEach((publication) => {
+        this.setState({
+          localVideo: publication.track
+        })
+      })
+    }
   }
   
   participantDisconnected(participant) {
@@ -134,7 +150,9 @@ export default class IncomingVideoComponent extends React.Component {
   }
   
   trackSubscribed(participant, track) {
+    console.log(`subscribing to ${participant.identity}'s track: ${track.kind}`);
     const trackDom = track.attach();
+    trackDom.style.maxWidth = "50%";
     const participantElement = document.getElementById(participant.sid);
     // remote
     //trackDom.style.maxWidth = "100%";
@@ -229,17 +247,27 @@ export default class IncomingVideoComponent extends React.Component {
 
   render() {
     return (
-      <div>
-        <Button variant="contained" style={ButtonStyle} color="secondary" onClick={this.disconnect}>Disconnect</Button>
-        { !this.state.screenTrack ? <Button onClick={this.startScreenShare} variant='contained' style={ButtonStyle} color="primary">Screen Share</Button> : null }
-        { this.state.screenTrack ? <Button onClick={this.stopScreenShare} variant='contained' style={EvilButtonStyle}  color="secondary">Stop Screen Share</Button> : null }
-        { !this.state.localAudioDisabled ? <Button onClick={ this.mute } variant='contained' style={ButtonStyle} color="primary">Mute</Button> : null }
-        { this.state.localAudioDisabled ? <Button onClick={ this.unMute } variant='contained' style={EvilButtonStyle} color="secondary">Unmute</Button> : null }
-        { !this.state.localVideoDisabled ? <Button onClick={ this.camOff } variant='contained' style={ButtonStyle} color="primary">Turn Camera Off</Button> : null }
-        { this.state.localVideoDisabled ? <Button onClick={ this.camOn } variant='contained' style={EvilButtonStyle} color="secondary">Turn Camera On</Button> : null }
-        { this.state.activeRoom ? <Button onClick={ this.dialTarget } variant='contained' style={ButtonStyle} color="primary">Dial Target</Button> : null }
-        <div style={RemoteStyle} ref={this.remoteMedia} id="remote-media"></div>
-      </div>
+      <table>
+        <tbody>
+          <tr>
+            <td>
+              <Button variant="contained" style={ButtonStyle} color="secondary" onClick={this.disconnect}>Disconnect</Button>
+              { !this.state.screenTrack ? <Button onClick={this.startScreenShare} variant='contained' style={ButtonStyle} color="primary">Screen Share</Button> : null }
+              { this.state.screenTrack ? <Button onClick={this.stopScreenShare} variant='contained' style={EvilButtonStyle}  color="secondary">Stop Screen Share</Button> : null }
+              { !this.state.localAudioDisabled ? <Button onClick={ this.mute } variant='contained' style={ButtonStyle} color="primary">Mute</Button> : null }
+              { this.state.localAudioDisabled ? <Button onClick={ this.unMute } variant='contained' style={EvilButtonStyle} color="secondary">Unmute</Button> : null }
+              { !this.state.localVideoDisabled ? <Button onClick={ this.camOff } variant='contained' style={ButtonStyle} color="primary">Turn Camera Off</Button> : null }
+              { this.state.localVideoDisabled ? <Button onClick={ this.camOn } variant='contained' style={EvilButtonStyle} color="secondary">Turn Camera On</Button> : null }
+              { this.state.activeRoom ? <Button onClick={ this.dialTarget } variant='contained' style={ButtonStyle} color="primary">Dial Target</Button> : null }
+            </td>          
+          </tr>
+          <tr>
+            <td>
+              <div style={RemoteStyle} ref={this.remoteMedia} id="remote-media"></div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     )
   }
 }

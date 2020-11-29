@@ -1,0 +1,16 @@
+on task acceptance
+  enterRoom(roomName)
+
+onRoomEntered(room)
+  for each existing party: addParty(party)
+  set callbacks for future party enters and leaves
+
+addParty(party)
+  create UI container for party
+  for each existing track: addTrack(party, track)
+  set callbacks for future track adds and removes
+  add party UI to document
+
+addTrack(party, track)
+  create UI for track and add it to party's UI container
+
