@@ -36,6 +36,7 @@ export default class IncomingVideoComponent extends React.Component {
       localVideoDisabled: false
     };
     this.onRoomJoined = this.onRoomJoined.bind(this);
+    this.onDisconnected = this.onDisconnected.bind(this);
     this.participantConnected = this.participantConnected.bind(this);
     this.participantDisconnected = this.participantDisconnected.bind(this);
     this.trackSubscribed = this.trackSubscribed.bind(this);
@@ -89,17 +90,22 @@ export default class IncomingVideoComponent extends React.Component {
 
   async onRoomJoined(room) {
     this.setState({activeRoom: room});
-    this.participantConnected(room.localParticipant)
+    this.participantConnected(room.localParticipant);
     room.participants.forEach(this.participantConnected);
     room.on('participantConnected', this.participantConnected);
     room.on('participantDisconnected', this.participantDisconnected);
-    room.once(
+    room.on(
       'disconnected',
-      _err => room.participants.forEach(this.participantDisconnected)
+      this.onDisconnected
     );
+  }
 
-    const localVideoTrack = await Video.createLocalVideoTrack();
-    await room.localParticipant.publishTrack(localVideoTrack);
+  onDisconnected(room, error) {
+    if (error) {
+      console.log('Unexpectedly disconnected:', error);
+    }
+    this.participantDisconnected(room.localParticipant);
+    room.participants.forEach(this.participantDisconnected);
   }
 
   participantConnected(participant) {
@@ -127,7 +133,7 @@ export default class IncomingVideoComponent extends React.Component {
     // TODO figure out how to distinguish local from remote
     if (true) {
       // place the local audio in muted state
-      // TODO hacky! relying on their being only one pub of each type!
+      // TODO hacky! relying on there being only one pub of each type!
       participant.audioTracks.forEach((publication) => {
         if (publication.track) {
           publication.track.disable();
