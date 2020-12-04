@@ -2,8 +2,6 @@ import React from 'react';
 import Video from 'twilio-video';
 import Button from '@material-ui/core/Button';
 
-import VideoRoom from './VideoRoom';
-
 const {REACT_APP_SERVERLESS_DOMAIN} = process.env;
 
 const ButtonStyle = {
@@ -54,6 +52,8 @@ export default class IncomingVideoComponent extends React.Component {
     this.remoteMedia = React.createRef();
   }
 
+  // TODO why is connect-to-room done here and not in task.accepted CB?
+
   componentDidUpdate() {
     const taskStatus = this.props.task.taskStatus;
     if (this.state.taskStatus !== taskStatus) {
@@ -67,11 +67,11 @@ export default class IncomingVideoComponent extends React.Component {
         })
         .then(data => {
           if (!data.token) {
-            return console.log('there was an error with the video tokenizer response');
+            return console.log('ERROR: there was an error with the video tokenizer response');
           }
           Video.connect(data.token, { name: this.props.task.attributes.videoChatRoom })
             .then(this.onRoomJoined, error => {
-            alert('Could not connect to Twilio: ' + error.message);
+            alert(`ERROR: could not connect to Twilio: ${error.message}`);
           });
         })
       }
@@ -89,6 +89,7 @@ export default class IncomingVideoComponent extends React.Component {
   }
 
   async onRoomJoined(room) {
+    console.log(`onRoomJoined: joined room ${room.name}`);
     this.setState({activeRoom: room});
     this.participantConnected(room.localParticipant);
     room.participants.forEach(this.participantConnected);
@@ -102,7 +103,7 @@ export default class IncomingVideoComponent extends React.Component {
 
   onDisconnected(room, error) {
     if (error) {
-      console.log('Unexpectedly disconnected:', error);
+      console.log('ERROR: unexpectedly disconnected:', error);
     }
     this.participantDisconnected(room.localParticipant);
     room.participants.forEach(this.participantDisconnected);
@@ -115,7 +116,7 @@ export default class IncomingVideoComponent extends React.Component {
     div.id = participant.sid;
     div.innerText = participant.identity;
     div.style.borderStyle = "solid";
-    div.style.borderWidth = "3px";
+    div.style.borderWidth = "1px";
     div.style.borderColor = "red";
     remoteContainer.appendChild(div);
   
