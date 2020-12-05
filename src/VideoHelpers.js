@@ -231,6 +231,8 @@ export default (function() {
   function participantDisconnected(participant) {
     console.log(`participant ${participant.identity} disconnected`);
     document.getElementById(participant.sid).remove();
+    if (state.onVideoEvent)
+      state.onVideoEvent({type: 'participantLeft'});
   }
   
   // TODO seems like this is wet (see attachTracks)

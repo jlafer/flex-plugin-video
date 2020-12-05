@@ -17,6 +17,7 @@ export default function InterpreterComponent(props) {
   const [roomName, setRoomName] = useState('');
   const [identity, setIdentity] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [topic, setTopic] = useState('general');
   const [inRoom, setInRoom] = useState(false);
   const [inConference, setInConference] = useState(false);
   const [previewingVideo, setPreviewingVideo] = useState(false);
@@ -35,6 +36,7 @@ export default function InterpreterComponent(props) {
       setIdentity(name);
       setRoomName(room);
       setPhoneNumber(props.task.attributes.phoneNumber);
+      setTopic(props.task.attributes.topic);
       vlib.init({
         domain,
         previewRef, partiesRef, shareRef,
@@ -61,15 +63,15 @@ export default function InterpreterComponent(props) {
   
   function onJoinConference(_e) {
     const attributes = {
-      roomName,
-      customerName: identity,
-      phoneNumber
+      roomName, customerName: identity, phoneNumber, topic
     };
     console.log('onJoinConference: submitting task attributes:', attributes);
     submitTask(attributes);
+    setInConference(true);
   }
 
   function onLeaveConference(_e) {
+    setInConference(false);
     vlib.leave();
   }
 
@@ -91,24 +93,27 @@ export default function InterpreterComponent(props) {
 
   const onVideoEvent = (event) => {
     console.log('onVideoEvent: ', event);
-    if (event.type === 'roomJoined') {}
-    if (event.type === 'roomLeft') {}
-    if (event.type === 'audioMuted') {
-      setLocalAudioDisabled(true);
+    switch (event.type) {
+      case 'roomJoined':
+        break;
+      case 'roomLeft':
+        break;
+      case 'participantLeft':
+        setInConference(false);
+        break;
+      case 'audioMuted':
+        setLocalAudioDisabled(true);
+        break;
+      case 'videoMuted':
+        setLocalVideoDisabled(true);
+        break;
+      case 'audioUnmuted':
+        setLocalAudioDisabled(false);
+        break;
+      case 'videoUnmuted':
+        setLocalVideoDisabled(false);
+        break;
     }
-    if (event.type === 'videoMuted') {
-      setLocalVideoDisabled(true);
-    }
-    if (event.type === 'audioUnmuted') {
-      setLocalAudioDisabled(false);
-    }
-    if (event.type === 'videoUnmuted') {
-      setLocalVideoDisabled(false);
-    }
-    if (event.type === 'conferenceJoined')
-      setInConference(true);
-    if (event.type === 'conferenceLeft')
-      setInConference(false);
   }
 
   function dialTarget() {
@@ -229,9 +234,9 @@ function getScreenSharingButton(inRoom, sharingScreen, onShareScreenStart, onSha
 }
 
 function submitTask(taskData) {
-  const {roomName, customerName, phoneNumber} = taskData;
+  const {roomName, customerName, phoneNumber, topic} = taskData;
   fetch(
-    `${domain}/createvideotask?customerName=${customerName}&roomName=${roomName}&phoneNumber=${phoneNumber}`
+    `${domain}/createvideotask?customerName=${customerName}&roomName=${roomName}&phoneNumber=${phoneNumber}&topic=${topic}`
   )
   .then(res => res.json())
   .then(data => {console.log("submitTask: created task: data:", data);});

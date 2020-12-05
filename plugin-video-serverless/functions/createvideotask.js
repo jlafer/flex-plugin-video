@@ -57,16 +57,16 @@ exports.handler = function(context, event, callback) {
   const workspace = context.TWILIO_WORKSPACE_SID;
   const workflow = context.TWILIO_VIDEO_WORKFLOW_SID;
   const syncService = context.TWILIO_SYNC_SERVICE_SID;
-  const { roomName, customerName, worker, phoneNumber } = event;
+  const { roomName, customerName, phoneNumber, topic } = event;
 
   let client = context.getTwilioClient();
 
   createTask(client, workspace, workflow, {
     name: customerName,
     url: context.DOMAIN_NAME,
-    flexWorker: decodeURI(worker),
     phoneNumber: phoneNumber,
-    videoChatRoom: roomName
+    videoChatRoom: roomName,
+    topic: topic
   })
   .then(async task => {
     await createSyncDoc(client, syncService, roomName, task.sid, phoneNumber);
