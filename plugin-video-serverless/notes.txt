@@ -1,0 +1,3 @@
+twilio flex:plugins:release --name "v0.1" \
+--description "initial release" \
+--plugin plugin-video@0.0.1

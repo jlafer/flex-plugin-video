@@ -1,9 +1,8 @@
 import { FlexPlugin } from 'flex-plugin';
 import React from 'react';
-import IncomingVideoComponent from './IncomingVideoComponent';
+//import IncomingVideoComponent from './IncomingVideoComponent';
+import InterpreterComponent from './InterpreterComponent';
 import CustomTheme from './CustomTheme'
-import Videocam from '@material-ui/icons/Videocam';
-import VideoTextChat from './VideoTextChat';
 
 const PLUGIN_NAME = 'VideoPlugin';
 
@@ -20,10 +19,6 @@ export default class VideoPlugin extends FlexPlugin {
     };
     manager.updateConfig(configuration);
     manager.strings.NoTasks = "Convo Relay Demo";
-    //flex.MainContainer.Content.add(
-    //  <VideoTextChat key="chat" />,
-    //  { sortOrder: 100, align: 'start' }
-    //);
     flex.MainHeader.defaultProps.logoUrl = `${REACT_APP_SERVERLESS_DOMAIN}/ConvoLogoWeb.png`;
     flex.RootContainer.Content.remove("project-switcher");
 
@@ -44,7 +39,7 @@ export default class VideoPlugin extends FlexPlugin {
       {
         target: "CRMContainer",
         options: {sortOrder: 1, align: "start"},
-        component: <IncomingVideoComponent manager={manager} icon="Video" iconActive="Video" key="IncomingVideoComponent" />
+        component: <InterpreterComponent manager={manager} icon="Video" iconActive="Video" key="InterpreterComponent" />
       }
     ];
 

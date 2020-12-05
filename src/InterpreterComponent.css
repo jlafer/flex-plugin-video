@@ -1,0 +1,30 @@
+.main-container {
+  height: auto; /* will cover the 100% of viewport */
+  position: relative;
+}
+
+.flex-container {
+  display: grid;
+  grid-template-columns: 480px 960px;
+  grid-template-rows: 360px 140px;
+}
+
+.preview {
+  grid-row-start: 1; grid-column-start: 1;
+  border: 1px solid #cececc;
+}
+
+.parties {
+  grid-row-start: 1; grid-column-start: 2;
+  border: 1px solid #cececc;
+}
+
+.preview-ctls {
+  grid-row-start: 2; grid-column-start: 1;
+  border: 1px solid #cececc;
+}
+
+.call-ctls {
+  grid-row-start: 2; grid-column-start: 2;
+  border: 1px solid #cececc;
+}
