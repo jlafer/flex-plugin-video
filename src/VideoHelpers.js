@@ -7,6 +7,7 @@ export default (function() {
     token: null,
     roomName: '',
     identity: '',
+    options: {},
     previewRef: null,
     partiesRef: null,
     shareRef: null,
@@ -38,7 +39,7 @@ export default (function() {
         console.log('vlib.previewStart: started');
         state.previewTracks = tracks;
         const previewContainer = state.previewRef.current;
-        attachTracks(tracks, previewContainer);
+        attachTracks(tracks, previewContainer, state.options.preview);
         if (state.setPreviewingVideo)
           state.setPreviewingVideo(true);
       },
@@ -134,7 +135,7 @@ export default (function() {
     console.log(`onRoomJoined: room ${name} as ${localParticipant.identity}`);
     state.activeRoom = room;
     const localContainer = state.previewRef.current;
-    attachParticipantTracks(localParticipant, localContainer);
+    attachLocalTracks(localParticipant, localContainer, state.options.preview);
     participants.forEach(participantConnected);
     console.log(`onRoomJoined: registering CBs`);
     room.on('participantConnected', participantConnected);
@@ -185,6 +186,7 @@ export default (function() {
     stopPreviewTracks(state.previewTracks);
   }
   
+  // NOTE: called only for remote parties
   function participantConnected(participant) {
     const {identity, tracks} = participant;
     console.log(`participant ${identity} connected`);
@@ -192,13 +194,14 @@ export default (function() {
     addParticipantToContainer(participant, container);
     participant.on(
       'trackSubscribed',
-      track => trackSubscribed(participant, track)
+      track => trackSubscribed(state.options.party, participant, track)
     );
     participant.on('trackUnsubscribed', detachTrackFromElements);
+    // note participant.tracks are actually TrackPublications
     tracks.forEach(publication => {
       if (publication.track) {
         console.log(`subscribing to an existing track for ${identity}`);
-        trackSubscribed(participant, publication.track);
+        trackSubscribed(state.options.party, participant, publication.track);
       }
     });
   }
@@ -226,45 +229,50 @@ export default (function() {
     container.appendChild(div);
   }
   
-  function attachParticipantTracks(participant, container) {
+  function attachLocalTracks(participant, container, mbrOptions) {
     const publications = Array.from(participant.tracks.values())
     const tracks = publications.filter(pub => {
-      console.log(`attachParticipantTracks: ${participant.identity} has ${pub.kind} track`);
+      console.log(`attachLocalTracks: ${participant.identity} has ${pub.kind} track`);
       return (pub.kind !== 'data')
     })
     .map(pub => pub.track);
-    attachTracks(tracks, container);
+    attachTracks(tracks, container, mbrOptions);
   }
   
-  function attachTracks(tracks, container) {
+  function attachTracks(tracks, container, mbrOptions) {
     if (!container.querySelector("video")) {
       tracks.forEach(track => {
         console.log(`attachTracks: found ${track.kind} track`);
         if (track.kind !== 'data') {
-          console.log(`attachTracks: attaching ${track.kind} track`);
-          const element = track.attach();
-          container.appendChild(element);
+          attachTrack(track, container, mbrOptions)
         }
       });
     }
   }
-    
+
+  // TODO should we be appending tracks to dom child elements? seems like the
+  // caller should control HTML 
+  function attachTrack(track, container, mbrOptions) {
+    console.log(`attachTracks: attaching ${track.kind} track`);
+    const trackOptions = getTrackOptions(mbrOptions, track);
+    const element = track.attach();
+    if (trackOptions && trackOptions.className)
+      element.className = trackOptions.className;
+    if (trackOptions && trackOptions.width)
+      element.setAttribute('width', trackOptions.width);
+    container.appendChild(element);
+  }
+  
+  function trackSubscribed(mbrOptions, participant, track) {
+    if (track.kind !== 'data') {
+      const participantElement = document.getElementById(participant.sid);
+      attachTrack(track, participantElement, mbrOptions);
+    }
+  }
+
   function participantDisconnected(participant) {
     console.log(`participant ${participant.identity} disconnected`);
     document.getElementById(participant.sid).remove();
-  }
-  
-  // TODO seems like this is wet (see attachTracks)
-  // TODO should we be appending tracks to dom child elements? seems like the
-  // caller should control HTML 
-  function trackSubscribed(participant, track) {
-    if (track.kind !== 'data') {
-      console.log(`subscribing to ${participant.identity}'s track: ${track.kind}`);
-      const trackDom = track.attach();
-      trackDom.style.maxWidth = "50%";
-      const participantElement = document.getElementById(participant.sid);
-      participantElement.appendChild(trackDom);
-    }
   }
   
   function detachTracks(tracks) {
@@ -329,4 +337,11 @@ function muteOrUnmuteYourMedia(room, kind, action, onVideoEvent) {
       onVideoEvent({type: eventType});
     }
   });
+}
+
+function getTrackOptions(mbrOptions, track) {
+  if (mbrOptions)
+    return (track.kind === 'video') ? mbrOptions.video : mbrOptions.audio;
+  else
+    return null;
 }

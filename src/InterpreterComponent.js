@@ -34,6 +34,20 @@ export default function InterpreterComponent(props) {
       setTopic(props.task.attributes.topic);
       vlib.init({
         domain,
+        options: {
+          preview: {
+            video: {
+              className: 'preview-video',
+              width: '320'
+            }
+          },
+          party: {
+            video: {
+              className: 'party-video',
+              width: '480'
+            }
+          }
+        },
         previewRef, partiesRef, shareRef,
         setPreviewingVideo, setInRoom, setSharingScreen,
         onVideoEvent
