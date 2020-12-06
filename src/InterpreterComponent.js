@@ -1,16 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
 import Button from '@material-ui/core/Button';
-//import TextField from '@material-ui/core/TextField';
+import TextField from '@material-ui/core/TextField';
 import './InterpreterComponent.css';
 
 import vlib from './videoHelpers';
 
 const domain = process.env.REACT_APP_SERVERLESS_DOMAIN;
-
-const disconnectedStatuses = [
-  'completed',
-  'wrapping'
-];
 
 export default function InterpreterComponent(props) {
   console.log('InterpreterComponent: called with props', props);
@@ -18,6 +13,7 @@ export default function InterpreterComponent(props) {
   const [identity, setIdentity] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [topic, setTopic] = useState('general');
+  const [text, setText] = useState('');
   const [inRoom, setInRoom] = useState(false);
   const [inConference, setInConference] = useState(false);
   const [previewingVideo, setPreviewingVideo] = useState(false);
@@ -27,7 +23,6 @@ export default function InterpreterComponent(props) {
   const previewRef = useRef(null);
   const partiesRef = useRef(null);
   const shareRef = useRef(null);
-  //const [taskStatus, setTaskStatus] = useState(null);
 
   useEffect(
     () => {
@@ -43,8 +38,8 @@ export default function InterpreterComponent(props) {
         setPreviewingVideo, setInRoom, setSharingScreen,
         onVideoEvent
       });
-      console.log(`AFTER init, roomName=${name}`);
-      vlib.join(room, name, onVideoEvent);
+      console.log(`after init, roomName=${roomName}`);
+      vlib.join(room, name, onVideoEvent, true);
     },
     []
   );
@@ -91,6 +86,10 @@ export default function InterpreterComponent(props) {
     vlib.unmuteYourVideo();
   }
 
+  function submitText() {
+    vlib.sendText(text);
+  }
+  
   const onVideoEvent = (event) => {
     console.log('onVideoEvent: ', event);
     switch (event.type) {
@@ -139,6 +138,16 @@ export default function InterpreterComponent(props) {
       </div>
       <div className="parties">
         <div ref={partiesRef} id="remote-media" />
+        <div id="chat-log">
+          <TextField
+            value={text ? text : ""}
+            label="Chat Text"
+            variant="outlined"
+            disabled={!inRoom}
+            onChange={e => setText(e.target.value)}
+          />
+          { inRoom ? <Button onClick={ submitText } variant='contained' color="primary">Send</Button> : null }
+        </div>
       </div>
       <div className="preview-ctls">
         {previewVideo}

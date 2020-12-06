@@ -13,6 +13,8 @@ export default (function() {
     activeRoom: null,
     screenTrack: null,
     previewTracks: null,
+    hasDataTrack: false,
+    dataTrack: null,
     setPreviewingVideo: null,
     setInRoom: null,
     setSharingScreen: null,
@@ -50,19 +52,21 @@ export default (function() {
     detachAndStopPreviewTracks();
   }
   
-  const join = R.curry((roomName, identity, onVideoEvent) => {
+  const join = R.curry((roomName, identity, onVideoEvent, addDataTrack) => {
     state.roomName = roomName;
     state.identity = identity;
     state.onVideoEvent = onVideoEvent;
-    const name = identity;
+    state.hasDataTrack = addDataTrack;
     console.log(`joining room ${roomName} as ${identity}`);
     const connectOptions = {name: roomName};
     if (state.previewTracks)
       connectOptions.tracks = state.previewTracks;
+    else {
+      connectOptions.audio = true;
+      connectOptions.video = true;
+    }
     getToken(state.domain, identity)
-    .then(token => {
-      return Video.connect(token, connectOptions)
-    })
+    .then(token => Video.connect(token, connectOptions))
     .then(
       onRoomJoined,
       error => {
@@ -97,21 +101,25 @@ export default (function() {
       state.setSharingScreen(false);
     state.screenTrack = null;
   }
-
+  
   function muteYourAudio() {
-    muteOrUnmuteYourMedia(state.activeRoom, 'audio', 'mute');
+    muteOrUnmuteYourMedia(state.activeRoom, 'audio', 'mute', state.onVideoEvent);
   }
   
   function muteYourVideo() {
-    muteOrUnmuteYourMedia(state.activeRoom, 'video', 'mute');
+    muteOrUnmuteYourMedia(state.activeRoom, 'video', 'mute', state.onVideoEvent);
   }
     
   function unmuteYourAudio() {
-    muteOrUnmuteYourMedia(state.activeRoom, 'audio', 'unmute');
+    muteOrUnmuteYourMedia(state.activeRoom, 'audio', 'unmute', state.onVideoEvent);
   }
   
   function unmuteYourVideo() {
-    muteOrUnmuteYourMedia(state.activeRoom, 'video', 'unmute');
+    muteOrUnmuteYourMedia(state.activeRoom, 'video', 'unmute', state.onVideoEvent);
+  }
+    
+  function sendText(msg) {
+    state.dataTrack.send(msg);
   }
     
   function detachAndStopPreviewTracks() {
@@ -122,11 +130,12 @@ export default (function() {
   }
   
   async function onRoomJoined(room) {
-    console.log(`onRoomJoined: room ${room.name} as ${state.identity}`);
+    const {name, localParticipant, participants} = room;
+    console.log(`onRoomJoined: room ${name} as ${localParticipant.identity}`);
     state.activeRoom = room;
     const localContainer = state.previewRef.current;
-    attachParticipantTracks(room.localParticipant, localContainer);
-    room.participants.forEach(participantConnected);
+    attachParticipantTracks(localParticipant, localContainer);
+    participants.forEach(participantConnected);
     console.log(`onRoomJoined: registering CBs`);
     room.on('participantConnected', participantConnected);
     room.on('participantDisconnected', participantDisconnected);
@@ -141,6 +150,10 @@ export default (function() {
       state.setPreviewingVideo(false);
     if (state.onVideoEvent)
       state.onVideoEvent({type: 'roomJoined'});
+    if (state.hasDataTrack) {
+      const localDataTrack = new Video.LocalDataTrack({name: 'chat'});
+      room.localParticipant.publishTrack(localDataTrack);
+    }
   }
   
   function onDisconnected(room, error) {
@@ -166,13 +179,15 @@ export default (function() {
   
   function detachParticipantTracks(participant) {
     const publications = Array.from(participant.tracks.values())
-    const tracks = publications.map(pub => pub.track);
+    const tracks = publications.filter(pub => pub.kind !== 'data')
+      .map(pub => pub.track);
     detachTracks(tracks);
     stopPreviewTracks(state.previewTracks);
   }
   
   function participantConnected(participant) {
-    console.log(`participant ${participant.identity} connected`);
+    const {identity, tracks} = participant;
+    console.log(`participant ${identity} connected`);
     const container = state.partiesRef.current;
     addParticipantToContainer(participant, container);
     participant.on(
@@ -180,9 +195,9 @@ export default (function() {
       track => trackSubscribed(participant, track)
     );
     participant.on('trackUnsubscribed', detachTrackFromElements);
-    participant.tracks.forEach(publication => {
+    tracks.forEach(publication => {
       if (publication.track) {
-        console.log(`subscribing to an existing track for ${participant.identity}`);
+        console.log(`subscribing to an existing track for ${identity}`);
         trackSubscribed(participant, publication.track);
       }
     });
@@ -213,17 +228,23 @@ export default (function() {
   
   function attachParticipantTracks(participant, container) {
     const publications = Array.from(participant.tracks.values())
-    const tracks = publications.map(pub => pub.track);
+    const tracks = publications.filter(pub => {
+      console.log(`attachParticipantTracks: ${participant.identity} has ${pub.kind} track`);
+      return (pub.kind !== 'data')
+    })
+    .map(pub => pub.track);
     attachTracks(tracks, container);
   }
   
   function attachTracks(tracks, container) {
     if (!container.querySelector("video")) {
       tracks.forEach(track => {
-        const videoElement = track.attach();
-        videoElement.width = 480;
-        videoElement.height = 360;
-        container.appendChild(videoElement);
+        console.log(`attachTracks: found ${track.kind} track`);
+        if (track.kind !== 'data') {
+          console.log(`attachTracks: attaching ${track.kind} track`);
+          const element = track.attach();
+          container.appendChild(element);
+        }
       });
     }
   }
@@ -231,27 +252,32 @@ export default (function() {
   function participantDisconnected(participant) {
     console.log(`participant ${participant.identity} disconnected`);
     document.getElementById(participant.sid).remove();
-    if (state.onVideoEvent)
-      state.onVideoEvent({type: 'participantLeft'});
   }
   
   // TODO seems like this is wet (see attachTracks)
+  // TODO should we be appending tracks to dom child elements? seems like the
+  // caller should control HTML 
   function trackSubscribed(participant, track) {
-    console.log(`subscribing to ${participant.identity}'s track: ${track.kind}`);
-    const trackDom = track.attach();
-    trackDom.style.maxWidth = "50%";
-    const participantElement = document.getElementById(participant.sid);
-    participantElement.appendChild(trackDom);
+    if (track.kind !== 'data') {
+      console.log(`subscribing to ${participant.identity}'s track: ${track.kind}`);
+      const trackDom = track.attach();
+      trackDom.style.maxWidth = "50%";
+      const participantElement = document.getElementById(participant.sid);
+      participantElement.appendChild(trackDom);
+    }
   }
   
   function detachTracks(tracks) {
     tracks.forEach(track => {
-      detachTrackFromElements(track);
+      if (track.kind !== 'data') {
+        detachTrackFromElements(track);
+      }
     });
   }
   
   function detachTrackFromElements(track) {
-    track.detach().forEach(element => element.remove());
+    if (track.kind !== 'data')
+      track.detach().forEach(element => element.remove());
   }
     
   function getScreenShare() {
@@ -271,7 +297,8 @@ export default (function() {
     previewStart, previewStop,
     join, leave,
     shareStart, shareStop,
-    muteYourAudio, unmuteYourAudio, muteYourVideo, unmuteYourVideo
+    muteYourAudio, unmuteYourAudio, muteYourVideo, unmuteYourVideo,
+    sendText
   }
 })();
 
@@ -287,20 +314,19 @@ export function fetchVideoToken(url, identity) {
   });
 }
 
-function muteOrUnmuteYourMedia(room, kind, action) {
-  const publications = kind === 'audio'
+function muteOrUnmuteYourMedia(room, kind, action, onVideoEvent) {
+  const publications = (kind === 'audio')
     ? room.localParticipant.audioTracks
     : room.localParticipant.videoTracks;
 
   publications.forEach(function(publication) {
-    if (action === 'mute') {
+    if (action === 'mute')
       publication.track.disable();
-    } else {
+    else
       publication.track.enable();
-    }
-    if (state.onVideoEvent) {
+    if (onVideoEvent) {
       const eventType = `${kind}${action === 'mute' ? 'Muted' : 'Unmuted'}`
-      state.onVideoEvent({type: eventType});
+      onVideoEvent({type: eventType});
     }
   });
 }
