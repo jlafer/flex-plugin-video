@@ -159,8 +159,8 @@ export default function InterpreterComponent(props) {
 
   function createMessage(fromName, message) {
     const pElement = document.createElement('p');
-    pElement.className = 'chat-text';
-    pElement.innerText = `${fromName}: ${message}`;
+    //pElement.className = 'chat-text';
+    pElement.innerHTML = `<b>${fromName}:</b>  ${message}`;
     return pElement;
   }
 
@@ -176,7 +176,8 @@ export default function InterpreterComponent(props) {
     })
   }
 
-  const previewVideo = getVideoPreviewButton(inRoom, previewingVideo, onPreviewStart, onPreviewStop, classes);
+  //const previewVideo = getVideoPreviewButton(inRoom, previewingVideo, onPreviewStart, onPreviewStop, classes);
+  const previewVideo = null;
 
   return (
     <div className="flex-container">

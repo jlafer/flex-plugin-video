@@ -231,9 +231,6 @@ export default (function() {
     div.id = participant.sid;
     // TODO this should move over to caller
     div.innerText = participant.identity;
-    div.style.borderStyle = "solid";
-    div.style.borderWidth = "1px";
-    div.style.borderColor = "blue";
     container.appendChild(div);
   }
   
