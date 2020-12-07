@@ -176,7 +176,6 @@ export default function InterpreterComponent(props) {
     })
   }
 
-  //const previewVideo = getVideoPreviewButton(inRoom, previewingVideo, onPreviewStart, onPreviewStop, classes);
   const previewVideo = null;
 
   return (
@@ -185,7 +184,8 @@ export default function InterpreterComponent(props) {
         <div ref={previewRef} />
       </div>
       <div className="parties">
-        <div ref={partiesRef} id="remote-media" />
+        <div ref={shareRef} className="party-video" />
+        <div ref={partiesRef} className="flex-gallery" />
       </div>
       <div className="preview-ctls">
         {previewVideo}
@@ -222,27 +222,6 @@ export default function InterpreterComponent(props) {
   )
 }
 
-function getVideoPreviewButton(inRoom, previewingVideo, onPreviewStart, onPreviewStop, classes) {
-  let previewVideo;
-
-  if (inRoom) {
-    previewVideo = 
-      <Button disabled variant="contained" className={classes.margin} >Stop Preview</Button>;
-  } else if (previewingVideo) {
-    previewVideo = 
-      <Button color="secondary" onClick={onPreviewStop} variant="contained" className={classes.margin}>
-        Stop Preview
-      </Button>;
-  } else {
-    previewVideo = (
-      <Button color="primary" onClick={onPreviewStart} variant="contained" className={classes.margin}>
-        Preview Video
-      </Button>
-    );
-  }
-  return previewVideo;
-}
-  
 function submitTask(taskData) {
   const {roomName, customerName, phoneNumber, topic} = taskData;
   fetch(

@@ -5,12 +5,13 @@
 
 .flex-container {
   display: grid;
-  grid-template-columns: 480px 480px 480px;
-  grid-template-rows: 360px 140px;
+  grid-template-rows: 400px 160px 240px;
+  grid-template-columns: 320px 960px 480px;
 }
 
 .preview {
-  grid-row-start: 1; grid-column-start: 1;
+  grid-row-start: 2;
+  grid-column-start: 1;
   border: 1px solid #cececc;
 }
 
@@ -20,8 +21,13 @@
 
 .parties {
   grid-row-start: 1;
-  grid-column-start: 2; grid-column-end: 4;
+  grid-column-start: 1; grid-column-end: 4;
+  display: flex;
   border: 1px solid #cececc;
+}
+
+.flex-gallery {
+  display: flex;
 }
 
 .party-video {
@@ -29,21 +35,20 @@
 }
 
 .preview-ctls {
-  grid-row-start: 2; grid-column-start: 1;
+  grid-row-start: 3;
+  grid-column-start: 1;
   border: 1px solid #cececc;
 }
 
 .call-ctls {
-  grid-row-start: 2; grid-column-start: 2;
+  grid-row-start: 2;
+  grid-column-start: 2;
   border: 1px solid #cececc;
 }
 
 .chat {
-  grid-row-start: 2; grid-column-start: 3;
+  grid-row-start: 2;
+  grid-column-start: 3;
   border: 1px solid #cececc;
   text-align: left;
-}
-
-.button {
-  margin: 10px
 }
