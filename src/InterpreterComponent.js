@@ -126,7 +126,29 @@ export default function InterpreterComponent(props) {
       case 'videoUnmuted':
         setLocalVideoDisabled(false);
         break;
+      case 'msgReceived':
+        addRemoteText(event.msg, event.identity);
     }
+  }
+
+  function addRemoteText(msg, identity) {
+    const chatLog = document.getElementById('chat-log');
+    chatLog.appendChild(createMessage(identity, msg));
+    chatLog.scrollTop = chatLog.scrollHeight;
+  }
+
+  function addLocalText(_e) {
+    const chatLog = document.getElementById('chat-log');
+    chatLog.appendChild(createMessage('me', text));
+    chatLog.scrollTop = chatLog.scrollHeight;
+    vlib.sendText(text);
+  }
+
+  function createMessage(fromName, message) {
+    const pElement = document.createElement('p');
+    pElement.className = 'chat-text';
+    pElement.innerText = `${fromName}: ${message}`;
+    return pElement;
   }
 
   function dialTarget() {
@@ -160,7 +182,7 @@ export default function InterpreterComponent(props) {
             disabled={!inRoom}
             onChange={e => setText(e.target.value)}
           />
-          { inRoom ? <Button onClick={ submitText } variant='contained' color="primary">Send</Button> : null }
+          { inRoom ? <Button onClick={addLocalText} variant='contained' color="primary">Send</Button> : null }
         </div>
       </div>
       <div className="preview-ctls">

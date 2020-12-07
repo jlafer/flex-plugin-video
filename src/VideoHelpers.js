@@ -152,8 +152,8 @@ export default (function() {
     if (state.onVideoEvent)
       state.onVideoEvent({type: 'roomJoined'});
     if (state.hasDataTrack) {
-      const localDataTrack = new Video.LocalDataTrack({name: 'chat'});
-      room.localParticipant.publishTrack(localDataTrack);
+      state.dataTrack = new Video.LocalDataTrack({name: 'chat'});
+      room.localParticipant.publishTrack(state.dataTrack);
     }
   }
   
@@ -188,7 +188,7 @@ export default (function() {
   
   // NOTE: called only for remote parties
   function participantConnected(participant) {
-    const {identity, tracks} = participant;
+    const {identity, tracks, dataTracks} = participant;
     console.log(`participant ${identity} connected`);
     const container = state.partiesRef.current;
     addParticipantToContainer(participant, container);
@@ -202,6 +202,14 @@ export default (function() {
       if (publication.track) {
         console.log(`subscribing to an existing track for ${identity}`);
         trackSubscribed(state.options.party, participant, publication.track);
+      }
+    });
+    dataTracks.forEach(function(publication) {
+      if (publication.isSubscribed && publication.trackName === 'chat') {
+        publication.track.on('message', function(msg) {
+          if (state.onVideoEvent)
+            state.onVideoEvent({type: 'msgReceived', msg, identity});
+        });
       }
     });
   }
@@ -267,6 +275,14 @@ export default (function() {
     if (track.kind !== 'data') {
       const participantElement = document.getElementById(participant.sid);
       attachTrack(track, participantElement, mbrOptions);
+    }
+    else {
+      if (track.name === 'chat') {
+        track.on('message', function(msg) {
+          if (state.onVideoEvent)
+            state.onVideoEvent({type: 'msgReceived', msg, identity: participant.identity});
+        });
+      }  
     }
   }
 
