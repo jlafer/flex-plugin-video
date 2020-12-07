@@ -26,7 +26,8 @@ export default function InterpreterComponent(props) {
 
   useEffect(
     () => {
-      const name = props.manager.workerClient.name;
+      const name = props.manager.workerClient.attributes.full_name;
+      console.log('init: workerClient: ', props.manager.workerClient);
       const room = props.task.attributes.videoChatRoom;
       setIdentity(name);
       setRoomName(room);
@@ -142,6 +143,7 @@ export default function InterpreterComponent(props) {
     chatLog.appendChild(createMessage('me', text));
     chatLog.scrollTop = chatLog.scrollHeight;
     vlib.sendText(text);
+    setText('');
   }
 
   function createMessage(fromName, message) {
@@ -174,16 +176,6 @@ export default function InterpreterComponent(props) {
       </div>
       <div className="parties">
         <div ref={partiesRef} id="remote-media" />
-        <div id="chat-log">
-          <TextField
-            value={text ? text : ""}
-            label="Chat Text"
-            variant="outlined"
-            disabled={!inRoom}
-            onChange={e => setText(e.target.value)}
-          />
-          { inRoom ? <Button onClick={addLocalText} variant='contained' color="primary">Send</Button> : null }
-        </div>
       </div>
       <div className="preview-ctls">
         {previewVideo}
@@ -197,6 +189,24 @@ export default function InterpreterComponent(props) {
         { !localVideoDisabled ? <Button onClick={ camOff } variant='contained' color="primary">Turn Camera Off</Button> : null }
         { localVideoDisabled ? <Button onClick={ camOn } variant='contained' color="secondary">Turn Camera On</Button> : null }
         { inRoom ? <Button onClick={ dialTarget } variant='contained' color="primary">Dial Target</Button> : null }
+      </div>
+      <div className="chat">
+      {inRoom ? (
+        <div>
+          <div id="chat-log" />
+          <div>
+            <TextField
+                value={text ? text : ""}
+                id="chat-text-fld"
+                label="Chat Text"
+                variant="outlined"
+                disabled={!inRoom}
+                onChange={e => setText(e.target.value)}
+            />
+            <Button onClick={addLocalText} variant='contained' color="primary">Send</Button>
+          </div>
+        </div>
+      ) : null}
       </div>
     </div>
   )
