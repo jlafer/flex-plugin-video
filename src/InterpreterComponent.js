@@ -1,15 +1,25 @@
 import React, { useState, useEffect, useRef } from "react";
+import { makeStyles } from '@material-ui/core/styles';
 import Button from '@material-ui/core/Button';
 import TextField from '@material-ui/core/TextField';
 import './InterpreterComponent.css';
-
+import VideoCallControls from './VideoCallControls';
 import vlib from './videoHelpers';
 
 const domain = process.env.REACT_APP_SERVERLESS_DOMAIN;
 
+const useStyles = makeStyles((theme) => ({
+  margin: {
+    margin: theme.spacing(1),
+  }
+}));
+
 export default function InterpreterComponent(props) {
   console.log('InterpreterComponent: called with props', props);
+  const classes = useStyles();
+
   const [roomName, setRoomName] = useState('');
+  const [customerName, setCustomerName] = useState('');
   const [identity, setIdentity] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [topic, setTopic] = useState('general');
@@ -17,22 +27,23 @@ export default function InterpreterComponent(props) {
   const [inRoom, setInRoom] = useState(false);
   const [inConference, setInConference] = useState(false);
   const [previewingVideo, setPreviewingVideo] = useState(false);
+  const [onPhone, setOnPhone] = useState(false);
   const [sharingScreen, setSharingScreen] = useState(false);
-  const [localVideoDisabled, setLocalVideoDisabled] = useState(false);
-  const [localAudioDisabled, setLocalAudioDisabled] = useState(false);
+  const [videoDisabled, setVideoDisabled] = useState(false);
+  const [audioDisabled, setAudioDisabled] = useState(false);
   const previewRef = useRef(null);
   const partiesRef = useRef(null);
   const shareRef = useRef(null);
 
   useEffect(
     () => {
+      const {videoChatRoom: room, customerName, phoneNumber, topic} = props.task.attributes;
       const name = props.manager.workerClient.attributes.full_name;
-      console.log('init: workerClient: ', props.manager.workerClient);
-      const room = props.task.attributes.videoChatRoom;
       setIdentity(name);
+      setCustomerName(customerName);
       setRoomName(room);
-      setPhoneNumber(props.task.attributes.phoneNumber);
-      setTopic(props.task.attributes.topic);
+      setPhoneNumber(phoneNumber);
+      setTopic(topic);
       vlib.init({
         domain,
         options: {
@@ -116,16 +127,16 @@ export default function InterpreterComponent(props) {
         setInConference(false);
         break;
       case 'audioMuted':
-        setLocalAudioDisabled(true);
+        setAudioDisabled(true);
         break;
       case 'videoMuted':
-        setLocalVideoDisabled(true);
+        setVideoDisabled(true);
         break;
       case 'audioUnmuted':
-        setLocalAudioDisabled(false);
+        setAudioDisabled(false);
         break;
       case 'videoUnmuted':
-        setLocalVideoDisabled(false);
+        setVideoDisabled(false);
         break;
       case 'msgReceived':
         addRemoteText(event.msg, event.identity);
@@ -160,14 +171,12 @@ export default function InterpreterComponent(props) {
       `${domain}/dialAndAddToRoom?${urlParams}`
     )
     .then(response => {
-      return response.json()
+      setOnPhone(true);
+      return response.json();
     })
   }
 
-  const previewVideo = getVideoPreviewButton(inRoom, previewingVideo, onPreviewStart, onPreviewStop);
-  const hangupButton = getHangupButton(inRoom, onLeaveRoom);
-  const conferenceButton = getConferenceButton(inConference, onJoinConference, onLeaveConference);
-  const shareScreenButton = getScreenSharingButton(inRoom, sharingScreen, vlib.shareStart, vlib.shareStop);
+  const previewVideo = getVideoPreviewButton(inRoom, previewingVideo, onPreviewStart, onPreviewStop, classes);
 
   return (
     <div className="flex-container">
@@ -181,19 +190,17 @@ export default function InterpreterComponent(props) {
         {previewVideo}
       </div>
       <div className="call-ctls">
-        {hangupButton}
-        {conferenceButton}
-        {shareScreenButton}
-        { !localAudioDisabled ? <Button onClick={ mute } variant='contained' color="primary">Mute</Button> : null }
-        { localAudioDisabled ? <Button onClick={ unmute } variant='contained' color="secondary">Unmute</Button> : null }
-        { !localVideoDisabled ? <Button onClick={ camOff } variant='contained' color="primary">Turn Camera Off</Button> : null }
-        { localVideoDisabled ? <Button onClick={ camOn } variant='contained' color="secondary">Turn Camera On</Button> : null }
-        { inRoom ? <Button onClick={ dialTarget } variant='contained' color="primary">Dial Target</Button> : null }
+        <VideoCallControls inRoom={inRoom} onLeaveRoom={onLeaveRoom}
+          inConference={inConference} onJoinConference={onJoinConference} onLeaveConference={onLeaveConference}
+          sharingScreen={sharingScreen} shareStart={vlib.shareStart} shareStop={vlib.shareStop}
+          audioDisabled={audioDisabled} mute={mute} unmute={unmute}
+          videoDisabled={videoDisabled} camOff={camOff} camOn={camOn}
+          onPhone={onPhone} dialTarget={dialTarget}
+        />
       </div>
       <div className="chat">
       {inRoom ? (
         <div>
-          <div id="chat-log" />
           <div>
             <TextField
                 value={text ? text : ""}
@@ -202,9 +209,11 @@ export default function InterpreterComponent(props) {
                 variant="outlined"
                 disabled={!inRoom}
                 onChange={e => setText(e.target.value)}
+                className={classes.margin}
             />
-            <Button onClick={addLocalText} variant='contained' color="primary">Send</Button>
+            <Button onClick={addLocalText} variant='contained' color="primary" className={classes.margin}>Send</Button>
           </div>
+          <div id="chat-log" />
         </div>
       ) : null}
       </div>
@@ -212,20 +221,20 @@ export default function InterpreterComponent(props) {
   )
 }
 
-function getVideoPreviewButton(inRoom, previewingVideo, onPreviewStart, onPreviewStop) {
+function getVideoPreviewButton(inRoom, previewingVideo, onPreviewStart, onPreviewStop, classes) {
   let previewVideo;
 
   if (inRoom) {
     previewVideo = 
-      <Button disabled variant="contained" >Stop Preview</Button>;
+      <Button disabled variant="contained" className={classes.margin} >Stop Preview</Button>;
   } else if (previewingVideo) {
     previewVideo = 
-      <Button color="secondary" onClick={onPreviewStop} variant="contained" >
+      <Button color="secondary" onClick={onPreviewStop} variant="contained" className={classes.margin}>
         Stop Preview
       </Button>;
   } else {
     previewVideo = (
-      <Button color="primary" onClick={onPreviewStart} variant="contained">
+      <Button color="primary" onClick={onPreviewStart} variant="contained" className={classes.margin}>
         Preview Video
       </Button>
     );
@@ -233,61 +242,6 @@ function getVideoPreviewButton(inRoom, previewingVideo, onPreviewStart, onPrevie
   return previewVideo;
 }
   
-function getConferenceButton(inConference, onJoinConference, onLeaveConference) {
-  const button = inConference
-  ? (
-    <Button color="secondary" onClick={onLeaveConference} variant="contained">
-      Leave Conference
-    </Button>
-  )
-  : (
-    <Button color="primary" onClick={onJoinConference} variant="contained">
-      Conference
-    </Button>
-  );
-  return button;
-}
-
-function getHangupButton(inRoom, onLeaveRoom) {
-  const button = inRoom
-  ? (
-    <Button color="secondary" onClick={onLeaveRoom} variant="contained">
-      Hang Up
-    </Button>
-  )
-  : (
-    <div>
-      <Button disabled onClick={onLeaveRoom} variant="contained">
-        Hang Up
-      </Button>
-    </div>
-  );
-  return button;
-}
-
-function getScreenSharingButton(inRoom, sharingScreen, onShareScreenStart, onShareScreenStop) {
-  let button;
-
-  if (!inRoom) {
-    button = (
-      <Button disabled variant="contained">Share Screen</Button>
-    );
-  } else if (sharingScreen) {
-    button = (
-      <Button color="secondary" onClick={onShareScreenStop} variant="contained">
-        Stop Sharing
-      </Button>
-    );
-  } else {
-    button = (
-      <Button color="primary" onClick={onShareScreenStart} variant="contained">
-        Share Screen
-      </Button>
-    );
-  }
-  return button;
-}
-
 function submitTask(taskData) {
   const {roomName, customerName, phoneNumber, topic} = taskData;
   fetch(
