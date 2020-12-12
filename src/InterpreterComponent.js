@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { makeStyles } from '@material-ui/core/styles';
 import Button from '@material-ui/core/Button';
 import TextField from '@material-ui/core/TextField';
@@ -18,22 +18,24 @@ export default function InterpreterComponent(props) {
   console.log('InterpreterComponent: called with props', props);
   const classes = useStyles();
 
-  const [roomName, setRoomName] = useState('');
-  const [customerName, setCustomerName] = useState('');
-  const [identity, setIdentity] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
   const [topic, setTopic] = useState('general');
   const [text, setText] = useState('');
+  const [identity, setIdentity] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [inRoom, setInRoom] = useState(false);
-  const [inConference, setInConference] = useState(false);
   const [previewingVideo, setPreviewingVideo] = useState(false);
-  const [onPhone, setOnPhone] = useState(false);
   const [sharingScreen, setSharingScreen] = useState(false);
   const [videoDisabled, setVideoDisabled] = useState(false);
   const [audioDisabled, setAudioDisabled] = useState(false);
-  const previewRef = useRef(null);
-  const partiesRef = useRef(null);
-  const shareRef = useRef(null);
+  const [previewWidth, setPreviewWidth] = useState('320');
+  const [previewClass, setPreviewClass] = useState('preview-video');
+  const [partywWidth, setPartyWidth] = useState('480');
+  const [partyClass, setPartyClass] = useState('party-video');
+
+  const [customerName, setCustomerName] = useState('');
+  const [roomName, setRoomName] = useState('');
+  const [inConference, setInConference] = useState(false);
+  const [onPhone, setOnPhone] = useState(false);
 
   useEffect(
     () => {
@@ -46,23 +48,7 @@ export default function InterpreterComponent(props) {
       setTopic(topic);
       vlib.init({
         domain,
-        options: {
-          preview: {
-            video: {
-              className: 'preview-video',
-              width: '320'
-            }
-          },
-          party: {
-            video: {
-              className: 'party-video',
-              width: '480'
-            }
-          }
-        },
-        previewRef, partiesRef, shareRef,
-        setPreviewingVideo, setInRoom, setSharingScreen,
-        onVideoEvent
+        setPreviewingVideo, setInRoom, setSharingScreen
       });
       console.log(`after init, roomName=${roomName}`);
       vlib.join(room, name, onVideoEvent, true);
@@ -70,8 +56,10 @@ export default function InterpreterComponent(props) {
     []
   );
 
+  // TODO right now, there is no way for an agent to preview before they
+  // take a video call
   function onPreviewStart(_e) {
-    vlib.previewStart();
+    vlib.previewStart(onVideoEvent);
   }
   
   function onPreviewStop(_e) {
@@ -123,8 +111,15 @@ export default function InterpreterComponent(props) {
         break;
       case 'roomLeft':
         break;
-      case 'participantLeft':
+      case 'partyJoined':
+        addPartyToGallery(event.identity, event.sid);
+        break;
+      case 'partyLeft':
+        removePartyFromGallery(event.identity, event.sid);
         setInConference(false);
+        break;
+      case 'trackAdded':
+        onTrackAdded(event);
         break;
       case 'audioMuted':
         setAudioDisabled(true);
@@ -139,8 +134,54 @@ export default function InterpreterComponent(props) {
         setVideoDisabled(false);
         break;
       case 'msgReceived':
-        addRemoteText(event.msg, event.identity);
+        addRemoteText(event.msg, event.participant.identity);
+        break;
     }
+  }
+
+  function addPartyToGallery(identity, sid) {
+    const gallery = document.getElementById('gallery');
+    const div = document.createElement('div');
+    div.id = sid;
+    div.innerText = identity;
+    gallery.appendChild(div);
+    console.log(`addPartyToGallery: after append, gallery:`, gallery);
+    const party = document.getElementById(sid);
+    console.log(`addPartyToGallery: after append, party by sid:`, party);
+  }
+  
+  function removePartyFromGallery(_identity, sid) {
+    document.getElementById(sid).remove();
+  }
+
+  function onTrackAdded(event) {
+    const {trackType, participant, track, element} = event;
+    const {kind} = track;
+    if (kind === 'data')
+      return;
+    console.log(`onTrackAdded: attaching ${kind} track`);
+    let domId, className, width;
+    if (trackType === 'remote') {
+      domId = participant.sid;
+      className = partyClass;
+      width = partywWidth;
+    }
+    else {
+      domId = 'local';
+      className = previewClass;
+      width = previewWidth;
+    }
+    console.log(`onTrackAdded: domId = ${domId}`);
+    const party = document.getElementById(domId);
+    console.log(`onTrackAdded: document:`, document);
+    console.log(`onTrackAdded: party by sid:`, party);
+    if (party.querySelector("video"))
+      return;
+    if (kind === 'video') {
+      element.className = className;
+      element.setAttribute('width', width);
+    }
+    party.appendChild(element);
   }
 
   function addRemoteText(msg, identity) {
@@ -181,11 +222,10 @@ export default function InterpreterComponent(props) {
   return (
     <div className="flex-container">
       <div className="preview">
-        <div ref={previewRef} />
+        <div id="local" />
       </div>
       <div className="parties">
-        <div ref={shareRef} className="party-video" />
-        <div ref={partiesRef} className="flex-gallery" />
+        <div id="gallery" className="flex-gallery" />
       </div>
       <div className="preview-ctls">
         {previewVideo}

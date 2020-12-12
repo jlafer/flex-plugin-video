@@ -14,3 +14,5 @@ addParty(party)
 addTrack(party, track)
   create UI for track and add it to party's UI container
 
+export TWILIO_ACCOUNT_SID=ACd281bfd36583f2b4e76cdeb7e198fb99
+export TWILIO_AUTH_TOKEN=bb331fd99f6abd28de253bb26813fafb

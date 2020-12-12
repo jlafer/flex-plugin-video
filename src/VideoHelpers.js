@@ -7,10 +7,6 @@ export default (function() {
     token: null,
     roomName: '',
     identity: '',
-    options: {},
-    previewRef: null,
-    partiesRef: null,
-    shareRef: null,
     activeRoom: null,
     screenTrack: null,
     previewTracks: null,
@@ -27,8 +23,9 @@ export default (function() {
     console.log('init: state now:', state);
   }
 
-  const previewStart = () => {
+  const previewStart = (onVideoEvent) => {
     console.log('vlib.previewStart: called');
+    state.onVideoEvent = onVideoEvent;
     const localTracksPromise = state.previewTracks
       ? Promise.resolve(state.previewTracks)
       : Video.createLocalTracks();
@@ -38,8 +35,7 @@ export default (function() {
       tracks => {
         console.log('vlib.previewStart: started');
         state.previewTracks = tracks;
-        const previewContainer = state.previewRef.current;
-        attachTracks(tracks, previewContainer, state.options.preview);
+        attachPreviewTracks(tracks);
         if (state.setPreviewingVideo)
           state.setPreviewingVideo(true);
       },
@@ -54,6 +50,9 @@ export default (function() {
   }
   
   const join = R.curry((roomName, identity, onVideoEvent, addDataTrack) => {
+    if (!onVideoEvent) {
+      throw new Error('onVideoEvent callback not supplied!')
+    }
     state.roomName = roomName;
     state.identity = identity;
     state.onVideoEvent = onVideoEvent;
@@ -83,6 +82,8 @@ export default (function() {
   
   function shareStart() {
     console.log('shareStart: called');
+    if (!state.activeRoom)
+      throw new Error('room not joined before shareStart called!')
     getScreenShare().then(stream => {
       console.log('shareStart: starting');
       state.screenTrack = stream.getVideoTracks()[0];
@@ -95,6 +96,8 @@ export default (function() {
   }
   
   function shareStop() {
+    if (!state.activeRoom)
+      throw new Error('room not joined before shareStop called!')
     state.activeRoom.localParticipant.unpublishTrack(
       state.screenTrack
     );
@@ -103,11 +106,22 @@ export default (function() {
     state.screenTrack = null;
   }
   
+  // TODO rename to sendMsg
+  function sendText(msg) {
+    if (!state.dataTrack)
+      throw new Error('data track not created before sendText called!')
+    state.dataTrack.send(msg);
+  }
+    
   function muteYourAudio() {
+    if (!state.activeRoom)
+      throw new Error('room not joined before muteYourAudio called!')
     muteOrUnmuteYourMedia(state.activeRoom, 'audio', 'mute', state.onVideoEvent);
   }
   
   function muteYourVideo() {
+    if (!state.activeRoom)
+      throw new Error('room not joined before muteYourVideo called!')
     muteOrUnmuteYourMedia(state.activeRoom, 'video', 'mute', state.onVideoEvent);
   }
     
@@ -119,54 +133,86 @@ export default (function() {
     muteOrUnmuteYourMedia(state.activeRoom, 'video', 'unmute', state.onVideoEvent);
   }
     
-  function sendText(msg) {
-    state.dataTrack.send(msg);
-  }
-    
-  function detachAndStopPreviewTracks() {
-    detachTracks(state.previewTracks);
-    stopPreviewTracks(state.previewTracks);
-    if (state.setPreviewingVideo)
-      state.setPreviewingVideo(false);
-  }
-  
   async function onRoomJoined(room) {
     const {name, localParticipant, participants} = room;
     console.log(`onRoomJoined: room ${name} as ${localParticipant.identity}`);
+    state.onVideoEvent({type: 'roomJoined'});
     state.activeRoom = room;
-    const localContainer = state.previewRef.current;
-    attachLocalTracks(localParticipant, localContainer, state.options.preview);
-    participants.forEach(participantConnected);
+    onNewParticipantTrackPubs('local', localParticipant);
+    participants.forEach(remoteParticipantJoined);
+
     console.log(`onRoomJoined: registering CBs`);
-    room.on('participantConnected', participantConnected);
-    room.on('participantDisconnected', participantDisconnected);
-    room.on(
-      'disconnected',
-      onDisconnected
-    );
+    room.on('participantConnected', remoteParticipantJoined);
+    room.on('participantDisconnected', remoteParticipantLeft);
+    room.on('disconnected', onDisconnected);
     console.log(`onRoomJoined: registered CBs`);
+
     if (state.setInRoom)
       state.setInRoom(true);
     if (state.setPreviewingVideo)
       state.setPreviewingVideo(false);
-    if (state.onVideoEvent)
-      state.onVideoEvent({type: 'roomJoined'});
     if (state.hasDataTrack) {
       state.dataTrack = new Video.LocalDataTrack({name: 'chat'});
       room.localParticipant.publishTrack(state.dataTrack);
     }
   }
   
-  function onDisconnected(room, error) {
-    if (error)
-      console.log('ERROR: unexpectedly disconnected:', error);
-    detachParticipantTracks(room.localParticipant);
-    room.participants.forEach(participantDisconnected);
-    if (state.setInRoom)
-      state.setInRoom(false);
-    state.activeRoom = null;
-    if (state.onVideoEvent)
-      state.onVideoEvent({type: 'roomLeft'});
+  function remoteParticipantJoined(participant) {
+    const {identity, sid} = participant;
+    console.log(`participant ${identity} connected`);
+    onNewParticipantTrackPubs('remote', participant);
+
+    participant.on(
+      'trackSubscribed',
+      track => onNewParticipantTrack('remote', participant, track)
+    );
+    participant.on('trackUnsubscribed', detachTrackFromElements);
+
+    state.onVideoEvent({type: 'partyJoined', identity, sid});
+  }
+  
+  function attachPreviewTracks(tracks) {
+    tracks.forEach(track => {
+      console.log(`attachPreviewTracks: attaching ${track.kind} track`);
+      const element = track.attach();
+      const event = {type: 'trackAdded', trackType: 'preview', track, element};
+      state.onVideoEvent(event);
+    });
+  }
+
+  function onNewParticipantTrackPubs(locOrRmt, participant) {
+    const {identity, tracks} = participant;
+    tracks.forEach(pub => {
+      if (pub.track) {
+        console.log(`onNewTrackPubs: ${identity} has ${pub.kind} track`);
+        onNewParticipantTrack(locOrRmt, participant, pub.track);
+      }
+    });
+  }
+
+  function onNewParticipantTrack(locOrRmt, participant, track) {
+    const event = {
+      type: 'trackAdded', trackType: locOrRmt, participant, track
+    };
+    // TODO is this needed?  if (pub.isSubscribed)
+    if (track.kind === 'data') {
+      track.on('message', function(msg) {
+        state.onVideoEvent({
+          type: 'msgReceived', trackType: locOrRmt, participant, track, msg
+        });
+      });
+    }
+    else {
+      event.element = track.attach();
+    }
+    state.onVideoEvent(event);
+  }
+
+  function detachAndStopPreviewTracks() {
+    detachTracks(state.previewTracks);
+    stopPreviewTracks(state.previewTracks);
+    if (state.setPreviewingVideo)
+      state.setPreviewingVideo(false);
   }
   
   function stopPreviewTracks(previewTracks) {
@@ -178,40 +224,23 @@ export default (function() {
     }
   }
   
+  function onDisconnected(room, error) {
+    if (error)
+      console.log('ERROR: unexpectedly disconnected:', error);
+    detachParticipantTracks(room.localParticipant);
+    room.participants.forEach(remoteParticipantLeft);
+    if (state.setInRoom)
+      state.setInRoom(false);
+    state.activeRoom = null;
+    state.onVideoEvent({type: 'roomLeft'});
+  }
+  
   function detachParticipantTracks(participant) {
     const publications = Array.from(participant.tracks.values())
     const tracks = publications.filter(pub => pub.kind !== 'data')
       .map(pub => pub.track);
     detachTracks(tracks);
     stopPreviewTracks(state.previewTracks);
-  }
-  
-  // NOTE: called only for remote parties
-  function participantConnected(participant) {
-    const {identity, tracks, dataTracks} = participant;
-    console.log(`participant ${identity} connected`);
-    const container = state.partiesRef.current;
-    addParticipantToContainer(participant, container);
-    participant.on(
-      'trackSubscribed',
-      track => trackSubscribed(state.options.party, participant, track)
-    );
-    participant.on('trackUnsubscribed', detachTrackFromElements);
-    // note participant.tracks are actually TrackPublications
-    tracks.forEach(publication => {
-      if (publication.track) {
-        console.log(`subscribing to an existing track for ${identity}`);
-        trackSubscribed(state.options.party, participant, publication.track);
-      }
-    });
-    dataTracks.forEach(function(publication) {
-      if (publication.isSubscribed && publication.trackName === 'chat') {
-        publication.track.on('message', function(msg) {
-          if (state.onVideoEvent)
-            state.onVideoEvent({type: 'msgReceived', msg, identity});
-        });
-      }
-    });
   }
   
   function getToken(domain, name) {
@@ -226,66 +255,10 @@ export default (function() {
     }
   }
   
-  function addParticipantToContainer(participant, container) {
-    const div = document.createElement('div');
-    div.id = participant.sid;
-    // TODO this should move over to caller
-    div.innerText = participant.identity;
-    container.appendChild(div);
-  }
-  
-  function attachLocalTracks(participant, container, mbrOptions) {
-    const publications = Array.from(participant.tracks.values())
-    const tracks = publications.filter(pub => {
-      console.log(`attachLocalTracks: ${participant.identity} has ${pub.kind} track`);
-      return (pub.kind !== 'data')
-    })
-    .map(pub => pub.track);
-    attachTracks(tracks, container, mbrOptions);
-  }
-  
-  function attachTracks(tracks, container, mbrOptions) {
-    if (!container.querySelector("video")) {
-      tracks.forEach(track => {
-        console.log(`attachTracks: found ${track.kind} track`);
-        if (track.kind !== 'data') {
-          attachTrack(track, container, mbrOptions)
-        }
-      });
-    }
-  }
-
-  // TODO should we be appending tracks to dom child elements? seems like the
-  // caller should control HTML 
-  function attachTrack(track, container, mbrOptions) {
-    console.log(`attachTracks: attaching ${track.kind} track`);
-    const trackOptions = getTrackOptions(mbrOptions, track);
-    const element = track.attach();
-    if (trackOptions && trackOptions.className)
-      element.className = trackOptions.className;
-    if (trackOptions && trackOptions.width)
-      element.setAttribute('width', trackOptions.width);
-    container.appendChild(element);
-  }
-  
-  function trackSubscribed(mbrOptions, participant, track) {
-    if (track.kind !== 'data') {
-      const participantElement = document.getElementById(participant.sid);
-      attachTrack(track, participantElement, mbrOptions);
-    }
-    else {
-      if (track.name === 'chat') {
-        track.on('message', function(msg) {
-          if (state.onVideoEvent)
-            state.onVideoEvent({type: 'msgReceived', msg, identity: participant.identity});
-        });
-      }  
-    }
-  }
-
-  function participantDisconnected(participant) {
-    console.log(`participant ${participant.identity} disconnected`);
-    document.getElementById(participant.sid).remove();
+  function remoteParticipantLeft(participant) {
+    const {identity, sid} = participant;
+    console.log(`participant ${identity} disconnected`);
+    state.onVideoEvent({type: 'partyLeft', identity, sid});
   }
   
   function detachTracks(tracks) {
@@ -345,16 +318,7 @@ function muteOrUnmuteYourMedia(room, kind, action, onVideoEvent) {
       publication.track.disable();
     else
       publication.track.enable();
-    if (onVideoEvent) {
-      const eventType = `${kind}${action === 'mute' ? 'Muted' : 'Unmuted'}`
-      onVideoEvent({type: eventType});
-    }
+    const eventType = `${kind}${action === 'mute' ? 'Muted' : 'Unmuted'}`
+    onVideoEvent({type: eventType});
   });
-}
-
-function getTrackOptions(mbrOptions, track) {
-  if (mbrOptions)
-    return (track.kind === 'video') ? mbrOptions.video : mbrOptions.audio;
-  else
-    return null;
 }
