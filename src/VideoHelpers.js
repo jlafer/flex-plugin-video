@@ -25,6 +25,8 @@ export default (function() {
 
   const previewStart = (onVideoEvent) => {
     console.log('vlib.previewStart: called');
+    if (!onVideoEvent)
+      throw new Error('onVideoEvent callback not supplied!')
     state.onVideoEvent = onVideoEvent;
     const localTracksPromise = state.previewTracks
       ? Promise.resolve(state.previewTracks)
@@ -33,7 +35,6 @@ export default (function() {
     localTracksPromise
     .then(
       tracks => {
-        console.log('vlib.previewStart: started');
         state.previewTracks = tracks;
         attachPreviewTracks(tracks);
         if (state.setPreviewingVideo)
@@ -50,9 +51,8 @@ export default (function() {
   }
   
   const join = R.curry((roomName, identity, onVideoEvent, addDataTrack) => {
-    if (!onVideoEvent) {
+    if (!onVideoEvent)
       throw new Error('onVideoEvent callback not supplied!')
-    }
     state.roomName = roomName;
     state.identity = identity;
     state.onVideoEvent = onVideoEvent;
