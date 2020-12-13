@@ -185,23 +185,22 @@ export default function InterpreterComponent(props) {
   }
 
   function addRemoteText(msg, identity) {
-    const chatLog = document.getElementById('chat-log');
-    chatLog.appendChild(createMessage(identity, msg));
-    chatLog.scrollTop = chatLog.scrollHeight;
+    const element = createMessage(identity, msg);
+    addElementToParentWithId('chat-log', element);
+    scrollChatLog('chat-log');
   }
 
   function addLocalText(_e) {
-    const chatLog = document.getElementById('chat-log');
-    chatLog.appendChild(createMessage('me', text));
-    chatLog.scrollTop = chatLog.scrollHeight;
+    const element = createMessage('me', text);
+    addElementToParentWithId('chat-log', element);
+    scrollChatLog('chat-log');
     vlib.sendText(text);
     setText('');
   }
 
   function createMessage(fromName, message) {
     const pElement = document.createElement('p');
-    //pElement.className = 'chat-text';
-    pElement.innerHTML = `<b>${fromName}:</b>  ${message}`;
+    pElement.innerHTML = `<b>${fromName}:</b> ${message}`;
     return pElement;
   }
 
@@ -260,6 +259,18 @@ export default function InterpreterComponent(props) {
       </div>
     </div>
   )
+}
+
+function addElementToParentWithId(id, element) {
+  const parent = document.getElementById(id);
+  parent.appendChild(element);
+  console.log('added child:', element);
+  console.log('...to parent', parent);
+}
+
+function scrollChatLog(id) {
+  const chatLog = document.getElementById(id);
+  chatLog.scrollTop = chatLog.scrollHeight;
 }
 
 function submitTask(taskData) {
